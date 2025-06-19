@@ -1,0 +1,17 @@
+{
+  "tasks": {
+    "dev": "deno run --watch --allow-env --env-file --allow-read --allow-net src/main.ts",
+    "start": "deno run --allow-env --env-file --allow-read --allow-net src/main.ts",
+    "f": "deno fmt && deno run --allow-read --allow-write scripts/add-header.ts"
+  },
+  "imports": {
+    "oceanic.js": "npm:oceanic.js@^1.12.1-dev.4909094",
+    "~root": "./src/",
+    "~command": "./src/command/"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-explicit-any"]
+    }
+  }
+}
