@@ -10,37 +10,19 @@ import {
   Input,
   Lexer,
   Parser,
-  parser,
+  parser as construct,
   ParsingResult,
   unexpectedEoi,
   unexpectedSymbol,
   yay,
 } from "./lib.ts";
 
-export const consumeWhile = (predicate: (char: string) => boolean) =>
-  parser((stream) => {
-    while (true) {
-      stream.commit();
-      const input = stream.advance();
-      if (!input || predicate(input)) {
-        stream.rollback();
-        break;
-      }
-      stream.finish();
-    }
-    return yay(null);
-  });
-
-export const skipWhitespaces = consumeWhile((x) => x.trim() !== "");
-
-export const construct = <U>(
-  fn: (input: Input) => ParsingResult<U>,
-): Parser<U> => parser(skipWhitespaces.map(fn));
+export const whitespace = pick(" ", "\t", "\r", "\n");
 
 const try_ = <T>(lex: Lexer<T>) =>
   construct((stream) => {
     stream.commit();
-    const result = parser(lex)(stream);
+    const result = construct(lex)(stream);
     if (infer("success")(result)) {
       stream.finish();
     } else {
@@ -49,36 +31,42 @@ const try_ = <T>(lex: Lexer<T>) =>
     return result;
   });
 
-export const pick = <T extends any[]>(
+export function pick<T extends string[]>(...lexers: T): Parser<T[number]>;
+export function pick<T extends any[]>(
   ...lexers: { [K in keyof T]: Lexer<T[K]> }
-): Parser<T[number]> =>
-  construct((stream) => {
+): Parser<T[number]>;
+export function pick(...lexers: any[]): any {
+  return construct((stream) => {
     for (const lexer of lexers) {
       const attempt = try_(lexer)(stream);
       if (infer("success")(attempt)) {
-        return yay(attempt as T[number]);
+        return yay(attempt);
       }
     }
     return unexpectedEoi(stream, "<pick>");
   });
+}
 
-export const few = <T extends any[]>(
+export function few<T extends string[]>(...lexers: T): Parser<T>;
+export function few<T extends any[]>(
   ...lexers: { [K in keyof T]: Lexer<T[K]> }
-): Parser<T> =>
-  construct((stream) => {
+): Parser<T>;
+export function few(...lexers: any[]): any {
+  return construct((stream) => {
     const output: unknown[] = [];
     for (const lexer of lexers) {
-      const result = parser(lexer)(stream);
+      const result = construct(lexer)(stream);
       if (!infer("success")(result)) {
         return result as ParsingResult<never>;
       }
       output.push(result.data);
     }
-    return yay(output as T);
+    return yay(output);
   });
+}
 
-export const many = <T>(lexer: Lexer<T>): Parser<T[]> =>
-  construct((stream) => {
+export function many<T>(lexer: Lexer<T>): Parser<T[]> {
+  return construct((stream) => {
     const output: T[] = [];
     while (true) {
       const attempt = try_(lexer)(stream);
@@ -89,9 +77,10 @@ export const many = <T>(lexer: Lexer<T>): Parser<T[]> =>
     }
     return yay(output);
   });
+}
 
-export const only = <T>(lexer: Lexer<T>) =>
-  construct((stream) => {
+export function only<T>(lexer: Lexer<T>): Parser<T> {
+  return construct((stream) => {
     const attempt = try_(lexer)(stream);
     if (!infer("success")(attempt)) {
       return attempt as ParsingResult<never>;
@@ -99,14 +88,16 @@ export const only = <T>(lexer: Lexer<T>) =>
     if (stream.tail()) {
       return expectedEoi(stream);
     }
-    return yay(attempt.data);
+    return yay(attempt.data as T);
   });
+}
 
-export const sequence = <T>(lexer: Lexer<T>): Parser<T[]> =>
-  few(lexer, many(lexer)).map((_, [a, b]) => yay([a, ...b]));
+export function sequence<T>(lexer: Lexer<T>): Parser<T[]> {
+  return few(lexer, many(lexer)).map((_, [a, b]) => yay([a, ...b]));
+}
 
-export const literal = <T extends string>(input: T): Parser<T> =>
-  construct((stream) => {
+export function literal<T extends string>(input: T): Parser<T> {
+  return construct((stream) => {
     for (const char of input) {
       if (stream.advance() !== char) {
         return unexpectedSymbol(stream, `${char} (full string: ${input})`);
@@ -114,27 +105,30 @@ export const literal = <T extends string>(input: T): Parser<T> =>
     }
     return yay(input);
   });
+}
 
-export const range = (start: string, end: string) =>
-  construct((stream) => {
+export function range(start: string, end: string): Parser<string> {
+  return construct((stream) => {
     const input = stream.advance();
     if (!input || input < start[0] || input > end[0]) {
       return unexpectedSymbol(stream, `${input} [${start}-${end}]`);
     }
     return yay(input!);
   });
+}
 
-export const optional = <T>(lexer: Lexer<T>): Parser<T | null> =>
-  construct((stream) => {
+export function optional<T>(lexer: Lexer<T>): Parser<T | null> {
+  return construct((stream) => {
     const attempt = try_(lexer)(stream);
     if (infer("success")(attempt)) {
       return attempt as ParsingResult<T>;
     }
     return yay(null);
   });
+}
 
-export const pattern = (pattern: RegExp): Parser<string> =>
-  parser((stream: Input) => {
+export function pattern(pattern: RegExp): Parser<string> {
+  return construct((stream: Input) => {
     const remaining = stream.tail();
     const anchoredPattern = new RegExp(`^(${pattern.source})`, pattern.flags);
     const match = remaining.match(anchoredPattern);
@@ -149,11 +143,12 @@ export const pattern = (pattern: RegExp): Parser<string> =>
 
     return yay(match[0]);
   });
+}
 
-export const capture = (
+export function capture(
   pattern: RegExp,
-): Parser<{ match: string; groups: string[] }> =>
-  parser((stream: Input) => {
+): Parser<{ match: string; groups: string[] }> {
+  return construct((stream: Input) => {
     const remaining = stream.tail();
     const anchoredPattern = new RegExp(`^(?:${pattern.source})`, pattern.flags);
     const object = remaining.match(anchoredPattern);
@@ -170,3 +165,4 @@ export const capture = (
 
     return yay({ match, groups });
   });
+}

@@ -28,7 +28,8 @@ export type ParsingResult<T> =
 export type ParsingError =
   | Tagged<"expected_eoi", [number, string]>
   | Tagged<"unexpected_eoi", [number, string]>
-  | Tagged<"unexpected_symbol", [number, string, string]>;
+  | Tagged<"unexpected_symbol", [number, string, string]>
+  | Tagged<"custom", string>;
 
 export const yay = <T>(
   data: T,
@@ -114,6 +115,9 @@ export function prettify(err: ParsingError): string {
   if (infer("unexpected_symbol")(err)) {
     const [index, got, expected] = err.data;
     return `Unexpected symbol '${got}' at index ${index}, expected ${expected}`;
+  }
+  if (infer("custom")(err)) {
+    return err.data;
   }
   return "unreachable // unknown";
 }
