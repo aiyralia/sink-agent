@@ -11,7 +11,7 @@ export type Input = StringStream;
 
 export type Tagged<Tag extends string, T> =
   & { kind: Tag }
-  & (T extends never ? {} : { data: T });
+  & (T extends never ? Record<PropertyKey, never> : { data: T });
 
 export type Parse<T> = (input: Input) => ParsingResult<T>;
 

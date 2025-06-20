@@ -1,3 +1,9 @@
+/**
+ * sink-agent, a ~~kitchen~~ bathroom sink Discord bot
+ * Copyright (c) 2025 aiyralia
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 import {
   few,
   literal,
@@ -7,13 +13,7 @@ import {
   sequence,
   whitespace,
 } from "./constructions.ts";
-import {
-  Lexer,
-  Parser,
-  parser as construct,
-  unexpectedSymbol,
-  yay,
-} from "./lib.ts";
+import { Lexer, parser as construct, unexpectedSymbol, yay } from "./lib.ts";
 import { alphanumeric } from "./primitives.ts";
 
 export const skip = many(whitespace);

@@ -1,3 +1,9 @@
+/**
+ * sink-agent, a ~~kitchen~~ bathroom sink Discord bot
+ * Copyright (c) 2025 aiyralia
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
 import { few, literal } from "./constructions.ts";
 import { boo, yay } from "./lib.ts";
 import { nat } from "./primitives.ts";

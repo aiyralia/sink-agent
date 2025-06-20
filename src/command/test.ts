@@ -32,8 +32,6 @@ const compare = <T>(res: ParsingResult<T>, data: T) => {
     assertEquals(res.data, data);
   }
 };
-const assertSuccessAll = (res: ParsingResult<any>[]) => res.map(assertSuccess);
-const assertFailAll = (res: ParsingResult<any>[]) => res.map(assertFail);
 
 Deno.test("ident combinator", async (t) => {
   await t.step(
@@ -125,5 +123,5 @@ Deno.test("commands", () => {
     positional("bleh"),
     optional(positional("ajajj")),
   );
-  console.log(cmd($`/hello -bleh a guh`));
+  assertSuccess(cmd($`/hello -bleh a guh`));
 });
