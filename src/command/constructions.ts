@@ -12,7 +12,6 @@ import {
   Parser,
   parser as construct,
   ParsingResult,
-  prettify,
   unexpectedEoi,
   unexpectedSymbol,
   yay,
