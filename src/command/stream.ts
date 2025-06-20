@@ -63,3 +63,17 @@ export class StringStream implements Stream<string> {
     return this.input.slice(this.position.offset);
   }
 }
+
+export function $(
+  strings: TemplateStringsArray,
+  ...values: any[]
+): StringStream {
+  let input = "";
+  for (let index = 0; index < strings.length; index++) {
+    input += strings[index];
+    if (index < values.length) {
+      input += values[index];
+    }
+  }
+  return new StringStream(input);
+}

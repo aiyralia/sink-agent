@@ -26,6 +26,7 @@ export type ParsingResult<T> =
   | Tagged<"error", ParsingError>;
 
 export type ParsingError =
+  | Tagged<"expected_eoi", [number, string]>
   | Tagged<"unexpected_eoi", [number, string]>
   | Tagged<"unexpected_symbol", [number, string, string]>;
 
@@ -42,6 +43,15 @@ export const boo = <K extends ParsingError["kind"]>(
     kind: "error",
     data: { kind, data } as any as Extract<ParsingError, { kind: K }>,
   }) as ParsingResult<never>;
+
+export function expectedEoi(
+  rcv: Input,
+) {
+  return boo("expected_eoi", [
+    rcv.position.offset,
+    rcv.tail(),
+  ]);
+}
 
 export function unexpectedEoi(
   rcv: Input,
@@ -93,6 +103,10 @@ export function infer<K extends string, U>(
 }
 
 export function prettify(err: ParsingError): string {
+  if (infer("expected_eoi")(err)) {
+    const [index, got] = err.data;
+    return `Expected end of input at index ${index}, got ${got}`;
+  }
   if (infer("unexpected_eoi")(err)) {
     const [index, expected] = err.data;
     return `Unexpected end of input at index ${index}, expected ${expected}`;

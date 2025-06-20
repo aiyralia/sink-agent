@@ -6,11 +6,8 @@
 
 import { yay } from "./lib.ts";
 import { few, optional, pick, range, sequence } from "./constructions.ts";
-import { StringStream } from "./stream.ts";
 
-export function stream(input: string): StringStream {
-  return new StringStream(input);
-}
+export { $ } from "./stream.ts";
 
 export const digit = range("0", "9");
 

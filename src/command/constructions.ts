@@ -5,7 +5,9 @@
  */
 
 import {
+  expectedEoi,
   infer,
+  Input,
   Lexer,
   Parser,
   parser,
@@ -31,7 +33,9 @@ export const consumeWhile = (predicate: (char: string) => boolean) =>
 
 export const skipWhitespaces = consumeWhile((x) => x.trim() !== "");
 
-export const construct = skipWhitespaces.map;
+export const construct = <U>(
+  fn: (input: Input) => ParsingResult<U>,
+): Parser<U> => parser(skipWhitespaces.map(fn));
 
 const try_ = <T>(lex: Lexer<T>) =>
   construct((stream) => {
@@ -73,7 +77,7 @@ export const few = <T extends any[]>(
     return yay(output as T);
   });
 
-export const many = <T>(lexer: Lexer<T>): Lexer<T[]> =>
+export const many = <T>(lexer: Lexer<T>): Parser<T[]> =>
   construct((stream) => {
     const output: T[] = [];
     while (true) {
@@ -84,6 +88,18 @@ export const many = <T>(lexer: Lexer<T>): Lexer<T[]> =>
       output.push(attempt.data as T);
     }
     return yay(output);
+  });
+
+export const only = <T>(lexer: Lexer<T>) =>
+  construct((stream) => {
+    const attempt = try_(lexer)(stream);
+    if (!infer("success")(attempt)) {
+      return attempt as ParsingResult<never>;
+    }
+    if (stream.tail()) {
+      return expectedEoi(stream);
+    }
+    return yay(attempt.data);
   });
 
 export const sequence = <T>(lexer: Lexer<T>): Parser<T[]> =>
@@ -103,12 +119,12 @@ export const range = (start: string, end: string) =>
   construct((stream) => {
     const input = stream.advance();
     if (!input || input < start[0] || input > end[0]) {
-      return yay(input!);
+      return unexpectedSymbol(stream, `${input} [${start}-${end}]`);
     }
-    return unexpectedSymbol(stream, `[${start}-${end}]`);
+    return yay(input!);
   });
 
-export const optional = <T>(lexer: Lexer<T>): Lexer<T | null> =>
+export const optional = <T>(lexer: Lexer<T>): Parser<T | null> =>
   construct((stream) => {
     const attempt = try_(lexer)(stream);
     if (infer("success")(attempt)) {

@@ -5,21 +5,7 @@
  */
 
 import { Client } from "npm:oceanic.js";
-
-// overengineered af cuz i felt like it
-function createEnvLoader<Keys extends readonly string[]>(keys: Keys) {
-  const proxy = new Proxy(Deno.env, {
-    get: (target, key) =>
-      target.get(key as string) ||
-      (() => {
-        throw new Error(`env.${key as string} isn't defined`);
-      })(),
-  }) as Record<Keys[number], string>;
-  keys.map((k) => proxy[k as Keys[number]]);
-  return proxy;
-}
-
-const env = createEnvLoader(["DISCORD_BOT_TOKEN", "DISCORD_APPLICATION_ID"]);
+import env from "./env.ts";
 
 const credentials = {
   discord: {
