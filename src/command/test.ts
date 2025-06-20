@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { many, only } from "./constructions.ts";
+import { capture, many, only, pattern } from "./constructions.ts";
 import { infer, parser, ParsingResult } from "./lib.ts";
 import {
   $,
@@ -105,5 +105,15 @@ Deno.test("primitives", async (t) => {
   await t.step("greedy alphanumeric", () => {
     assertSuccess(many(alphanumeric)($`Hello420`));
     assertFail(only(many(alphanumeric))($`Hello!`));
+  });
+  await t.step("regex patterns", () => {
+    compare(pattern(/[a-zA-Z_][a-zA-Z0-9_]*/)($`_World16`), "_World16");
+    compare(capture(/(\d{4})-(\d{2})-(\d{2})/)($`1984-01-01`), {
+      groups: ["1984", "01", "01"],
+      match: "1984-01-01",
+    });
+    assertFail(only(capture(/(\d{4})-(\d{2})-(\d{2})/))($`1984-01-01 bruh`));
+    assertFail(pattern(/[a-zA-Z_][a-zA-Z0-9_]*/)($`!_Wo.`));
+    assertFail(only(pattern(/[a-zA-Z_][a-zA-Z0-9_]*/))($`_World16!`));
   });
 });

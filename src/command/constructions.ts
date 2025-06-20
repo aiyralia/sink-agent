@@ -132,3 +132,41 @@ export const optional = <T>(lexer: Lexer<T>): Parser<T | null> =>
     }
     return yay(null);
   });
+
+export const pattern = (pattern: RegExp): Parser<string> =>
+  parser((stream: Input) => {
+    const remaining = stream.tail();
+    const anchoredPattern = new RegExp(`^(${pattern.source})`, pattern.flags);
+    const match = remaining.match(anchoredPattern);
+
+    if (!match) {
+      return unexpectedSymbol(
+        stream,
+        `pattern /${pattern.source}/${pattern.flags}, got ${remaining}`,
+      );
+    }
+    for (let i = 0; i < match[0].length; i++) stream.advance();
+
+    return yay(match[0]);
+  });
+
+export const capture = (
+  pattern: RegExp,
+): Parser<{ match: string; groups: string[] }> =>
+  parser((stream: Input) => {
+    const remaining = stream.tail();
+    const anchoredPattern = new RegExp(`^(?:${pattern.source})`, pattern.flags);
+    const object = remaining.match(anchoredPattern);
+
+    if (!object) {
+      return unexpectedSymbol(
+        stream,
+        `pattern /${pattern.source}/${pattern.flags}, got ${remaining}`,
+      );
+    }
+
+    const [match, ...groups] = object;
+    for (let i = 0; i < match[0].length; i++) stream.advance();
+
+    return yay({ match, groups });
+  });
