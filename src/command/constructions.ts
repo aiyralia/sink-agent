@@ -40,7 +40,7 @@ export function pick(...lexers: any[]): any {
     for (const lexer of lexers) {
       const attempt = try_(lexer)(stream);
       if (infer("success")(attempt)) {
-        return yay(attempt);
+        return yay(attempt.data);
       }
     }
     return unexpectedEoi(stream, "<pick>");

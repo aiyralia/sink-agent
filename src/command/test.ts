@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { capture, many, only, pattern } from "./constructions.ts";
+import { capture, many, only, optional, pattern } from "./constructions.ts";
+import { command, positional } from "./index.ts";
 import { infer, parser, ParsingResult } from "./lib.ts";
 import {
   $,
@@ -116,4 +117,13 @@ Deno.test("primitives", async (t) => {
     assertFail(pattern(/[a-zA-Z_][a-zA-Z0-9_]*/)($`!_Wo.`));
     assertFail(only(pattern(/[a-zA-Z_][a-zA-Z0-9_]*/))($`_World16!`));
   });
+});
+
+Deno.test("commands", () => {
+  const cmd = command(
+    ["hello"],
+    positional("bleh"),
+    optional(positional("ajajj")),
+  );
+  console.log(cmd($`/hello -bleh a guh`));
 });
