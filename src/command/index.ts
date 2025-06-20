@@ -11,9 +11,16 @@ import {
   optional,
   pick,
   sequence,
+  unordered,
   whitespace,
 } from "./constructions.ts";
-import { Lexer, parser as construct, unexpectedSymbol, yay } from "./lib.ts";
+import {
+  Lexer,
+  Parser,
+  parser as construct,
+  unexpectedSymbol,
+  yay,
+} from "./lib.ts";
 import { alphanumeric } from "./primitives.ts";
 
 export const skip = many(whitespace);
@@ -24,9 +31,10 @@ export const word = sequence((stream) => {
     return unexpectedSymbol(stream, "non-whitespace character");
   }
   return yay(character);
-}).map((_, chars) => yay(chars.join("")));
+}).map("word", (_, chars) => yay(chars.join("")));
 
 export const escape = few(literal("\\"), pick('"', "\\", "n", "t", "r")).map(
+  "escape",
   (_, [, char]) => {
     switch (char) {
       case "n":
@@ -52,10 +60,10 @@ export const quoted = (delimiter: string) =>
           return unexpectedSymbol(stream, "invalid sequence of characters");
         }
         return yay(char);
-      }),
+      }, "quoted_inner"),
     )),
     literal('"'),
-  ).map((_, [, chars]) => yay(chars.join("")));
+  ).map("quoted", (_, [, chars]) => yay(chars.join("")));
 
 export const quotedString = pick(quoted('"'), quoted("'"));
 
@@ -67,77 +75,75 @@ export const greedyString = construct((stream) => {
     stream.advance();
   }
   return yay(content);
-});
+}, "greedy_string");
 
 export const identifier = sequence(
   pick(alphanumeric, literal("-"), literal("_")),
-)
-  .map((_, chars) => yay(chars.join("")));
+).map("identifier", (_, chars) => yay(chars.join("")));
 
 ///////////////////////////////////////////////////////////////////////////
 
 export const flag = (name: Lexer<string>) =>
-  few("-", name).map((_, [, flag]) => yay(flag));
+  few("-", name).map("flag", (_, [, flag]) => yay(flag));
 
-export const positional = (name: string) =>
-  few(whitespace, flag(name), whitespace, string)
-    .map((_, [, key, , value]) =>
-      yay({ type: "positional", key, value: value })
+export const positional = <T>(name: string, kind: Lexer<T>) =>
+  few(skip, flag(name), skip, kind)
+    .map(
+      "positional",
+      (_, [, key, , value]) => yay({ type: "positional", key, value: value }),
     );
 
 export const prefix = pick(
   literal("/"),
   literal("$"),
   few(literal("<@1384657966061326406>"), optional(literal(" ")))
-    .map((_, [prefix]) => yay(prefix)),
+    .map("prefix", (_, [prefix]) => yay(prefix)),
 );
 
-export interface Command<T extends any[]> {
+export interface Command<T extends Record<string, any>> {
   prefix: string;
   label: string;
-  args: { [K in keyof T]: Lexer<T[K]> };
+  args: T;
   remaining: string;
 }
 
-// FIXME: do not use permutations for this shit. it's not optimized
-function permutations<T>(arr: T[]): T[][] {
-  if (arr.length <= 1) return [arr];
-  return arr.flatMap((item, i) =>
-    permutations([...arr.slice(0, i), ...arr.slice(i + 1)]).map(
-      (p) => [item, ...p],
-    )
-  );
-}
-
-export function command<T extends any[]>(
+export function command<L extends Record<string, Parser<any>>>(
   aliases: string[],
-  ...lexers: { [K in keyof T]: Lexer<T[K]> }
+  lexers: L,
 ) {
-  const args = permutations(lexers);
+  const keys = Object.keys(lexers) as (keyof L)[];
 
   return few(
     prefix,
     pick(...aliases.map(literal)),
-    pick(
-      ...args.map((permutation) =>
-        few(
-          ...permutation,
-          optional(
-            few(whitespace, greedyString).map((_, [, text]) => yay(text)),
-          ),
-        )
+    unordered(
+      ...Object.entries(lexers)
+        .map(([name, lx]) =>
+          lx.tag === "optional"
+            ? optional(positional(name, lx.next!))
+            : positional(name, lx)
+        ),
+      optional(
+        few(skip, greedyString).map(
+          "ws_greedy_string",
+          (_, [, text]) => yay(text),
+        ),
       ),
     ),
-  ).map((_, [prefix, label, args]) => {
+  ).map("command", (_, [prefix, label, args]) => {
     const remaining = args.length <= 1
       ? args.join(" ")
       : args[args.length - 1] as string;
     if (args.length) args.pop();
+
+    const namedArgs = Object.fromEntries(
+      keys.map((k, i) => [k, args[i]]),
+    ) as { [K in keyof L]: L[K] extends Lexer<infer U> ? U : never };
     return yay({
       prefix,
       label,
-      args,
+      args: namedArgs,
       remaining,
-    } as Command<T>);
+    } as Command<{ [K in keyof L]: L[K] extends Lexer<infer U> ? U : never }>);
   });
 }

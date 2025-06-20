@@ -16,7 +16,12 @@ export type Tagged<Tag extends string, T> =
 export type Parse<T> = (input: Input) => ParsingResult<T>;
 
 export type Parser<T> = Parse<T> & {
-  map<U>(fn: (input: Input, value: T) => ParsingResult<U>): Parser<U>;
+  tag: string;
+  next?: Parser<any>;
+  map<U>(
+    tag: string,
+    fn: (input: Input, value: T) => ParsingResult<U>,
+  ): Parser<U>;
 };
 
 export type Lexer<T> = Parse<T> | Parser<T> | string;
@@ -75,26 +80,31 @@ export function unexpectedSymbol(
   ]);
 }
 
-export function parser<T extends string>(lex: T): Parser<T>;
-export function parser<T>(lex: Lexer<T>): Parser<T>;
+export function parser<T extends string>(lex: T, tag?: string): Parser<T>;
+export function parser<T>(lex: Lexer<T>, tag?: string): Parser<T>;
 
-export function parser<T>(lex: Lexer<T>): Parser<T> {
+export function parser<T>(lex: Lexer<T>, tag?: string): Parser<T> {
   if (typeof lex === "string") return literal(lex) as Parser<T>;
   if ("map" in lex) return lex;
 
-  const parent = lex as Parser<T>;
-  parent.map = <U>(
+  const pars = lex as Parser<T>;
+  pars.tag = tag || ("tag" in lex ? lex.tag as string : "");
+  pars.map = <U>(
+    tag: string,
     fn: (input: Input, value: T) => ParsingResult<U>,
-  ): Parser<U> =>
-    parser((src: Input) => {
-      const result = parent(src);
+  ): Parser<U> => {
+    const neue = parser((src: Input) => {
+      const result = pars(src);
       if (infer("success")(result)) {
         return fn(src, result.data as T);
       }
       return result as ParsingResult<U>;
-    });
+    }, tag);
+    neue.next = pars;
+    return neue;
+  };
 
-  return parent;
+  return pars;
 }
 
 export function infer<K extends string, U>(

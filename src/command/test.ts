@@ -4,9 +4,16 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { capture, many, only, optional, pattern } from "./constructions.ts";
-import { command, positional } from "./index.ts";
-import { infer, parser, ParsingResult } from "./lib.ts";
+import {
+  capture,
+  literal,
+  many,
+  only,
+  optional,
+  pattern,
+} from "./constructions.ts";
+import { command, string } from "./index.ts";
+import { infer, ParsingResult, prettify } from "./lib.ts";
 import {
   $,
   alpha,
@@ -19,7 +26,7 @@ import {
 import { assertEquals, assertNotEquals } from "jsr:@std/assert";
 
 const assertSuccess = (res: ParsingResult<any>) => {
-  if (res.kind !== "success") console.log(res);
+  if (res.kind === "error") console.log(prettify(res.data));
   assertEquals(res.kind, "success");
 };
 const assertFail = (res: ParsingResult<any>) => {
@@ -36,11 +43,11 @@ const compare = <T>(res: ParsingResult<T>, data: T) => {
 Deno.test("ident combinator", async (t) => {
   await t.step(
     "should not fail given congruent input",
-    () => assertSuccess(parser("Hello")($`Hello`)),
+    () => assertSuccess(literal("Hello")($`Hello`)),
   );
   await t.step(
     "should fail given incongruent input",
-    () => assertFail(parser("Hallo")($`Hello`)),
+    () => assertFail(literal("Hallo")($`Hello`)),
   );
 });
 
@@ -120,8 +127,10 @@ Deno.test("primitives", async (t) => {
 Deno.test("commands", () => {
   const cmd = command(
     ["hello"],
-    positional("bleh"),
-    optional(positional("ajajj")),
+    {
+      bleh: string,
+      ajajj: optional(string),
+    },
   );
-  assertSuccess(cmd($`/hello -bleh a guh`));
+  console.log(cmd($`/hello -bleh a -ajajj dgs guh`));
 });

@@ -13,12 +13,13 @@ type Digit = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export const digit = range("0", "9") as Parser<`${Digit}`>;
 
-export const nat = sequence(digit).map((_, value) =>
-  yay(+value.join(""))
+export const nat = sequence(digit).map(
+  "nat",
+  (_, value) => yay(+value.join("")),
 ) as Parser<Digit>;
 
 export const int = few(optional(pick("+", "-")), nat)
-  .map((_, [sign, value]) => yay(sign === "-" ? -value : value));
+  .map("int", (_, [sign, value]) => yay(sign === "-" ? -value : value));
 
 export const lowercase = range("a", "z") as Parser<Alphabet>;
 export const uppercase = range("A", "Z") as Parser<Uppercase<Alphabet>>;

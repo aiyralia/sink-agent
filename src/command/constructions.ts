@@ -12,6 +12,7 @@ import {
   Parser,
   parser as construct,
   ParsingResult,
+  prettify,
   unexpectedEoi,
   unexpectedSymbol,
   yay,
@@ -29,7 +30,7 @@ const try_ = <T>(lex: Lexer<T>) =>
       stream.rollback();
     }
     return result;
-  });
+  }, "try");
 
 export function pick<T extends string[]>(...lexers: T): Parser<T[number]>;
 export function pick<T extends any[]>(
@@ -44,7 +45,7 @@ export function pick(...lexers: any[]): any {
       }
     }
     return unexpectedEoi(stream, "<pick>");
-  });
+  }, "pick");
 }
 
 export function few<T extends string[]>(...lexers: T): Parser<T>;
@@ -55,6 +56,13 @@ export function few(...lexers: any[]): any {
   return construct((stream) => {
     const output: unknown[] = [];
     for (const lexer of lexers) {
+      if (!lexer) {
+        console.log(lexers);
+        break;
+      }
+    }
+    for (const lexer of lexers) {
+      if (!lexer) continue;
       const result = construct(lexer)(stream);
       if (!infer("success")(result)) {
         return result as ParsingResult<never>;
@@ -62,7 +70,43 @@ export function few(...lexers: any[]): any {
       output.push(result.data);
     }
     return yay(output);
-  });
+  }, "few");
+}
+
+export function unordered<T extends string[]>(...lexers: T): Parser<T>;
+export function unordered<T extends any[]>(
+  ...lexers: { [K in keyof T]: Lexer<T[K]> }
+): Parser<T>;
+export function unordered(...lexers: any[]): any {
+  return construct((stream) => {
+    const parsers = lexers.map((lx) => construct(lx));
+    const output = new Array(parsers.length);
+    const parsed = new Set<number>();
+
+    stream.commit();
+
+    outer: for (let attempt = 0; attempt < parsers.length; attempt++) {
+      for (let index = 0; index < parsers.length; index++) {
+        if (parsed.has(index)) continue;
+        stream.commit();
+        const result = construct(parsers[index])(stream);
+        if (infer("success")(result)) {
+          output[index] = result.data;
+          parsed.add(index);
+          stream.finish();
+          continue outer;
+        }
+        stream.rollback();
+      }
+      stream.rollback();
+      return unexpectedSymbol(
+        stream,
+        `expected one of the remaining patterns (unordered few)`,
+      );
+    }
+    stream.finish();
+    return yay(output);
+  }, "unordered");
 }
 
 export function many<T>(lexer: Lexer<T>): Parser<T[]> {
@@ -76,7 +120,7 @@ export function many<T>(lexer: Lexer<T>): Parser<T[]> {
       output.push(attempt.data as T);
     }
     return yay(output);
-  });
+  }, "many");
 }
 
 export function only<T>(lexer: Lexer<T>): Parser<T> {
@@ -89,11 +133,11 @@ export function only<T>(lexer: Lexer<T>): Parser<T> {
       return expectedEoi(stream);
     }
     return yay(attempt.data as T);
-  });
+  }, "only");
 }
 
 export function sequence<T>(lexer: Lexer<T>): Parser<T[]> {
-  return few(lexer, many(lexer)).map((_, [a, b]) => yay([a, ...b]));
+  return few(lexer, many(lexer)).map("sequence", (_, [a, b]) => yay([a, ...b]));
 }
 
 export function literal<T extends string>(input: T): Parser<T> {
@@ -104,7 +148,7 @@ export function literal<T extends string>(input: T): Parser<T> {
       }
     }
     return yay(input);
-  });
+  }, input);
 }
 
 export function range(start: string, end: string): Parser<string> {
@@ -114,17 +158,19 @@ export function range(start: string, end: string): Parser<string> {
       return unexpectedSymbol(stream, `${input} [${start}-${end}]`);
     }
     return yay(input!);
-  });
+  }, "range");
 }
 
 export function optional<T>(lexer: Lexer<T>): Parser<T | null> {
-  return construct((stream) => {
+  const parser = construct((stream) => {
     const attempt = try_(lexer)(stream);
     if (infer("success")(attempt)) {
       return attempt as ParsingResult<T>;
     }
     return yay(null);
-  });
+  }, "optional");
+  parser.next = construct(lexer);
+  return parser;
 }
 
 export function pattern(pattern: RegExp): Parser<string> {
@@ -142,7 +188,7 @@ export function pattern(pattern: RegExp): Parser<string> {
     for (let i = 0; i < match[0].length; i++) stream.advance();
 
     return yay(match[0]);
-  });
+  }, "pattern");
 }
 
 export function capture(
@@ -164,5 +210,5 @@ export function capture(
     for (let i = 0; i < match[0].length; i++) stream.advance();
 
     return yay({ match, groups });
-  });
+  }, "capture");
 }
