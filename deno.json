@@ -6,12 +6,17 @@
   },
   "imports": {
     "oceanic.js": "npm:oceanic.js@^1.12.1-dev.4909094",
-    "~root": "./src/",
-    "~command": "./src/command/"
+    "~root/": "./src/",
+    "~command/": "./src/command/"
   },
   "lint": {
     "rules": {
       "exclude": ["no-explicit-any"]
     }
+  },
+  "test": {
+    "include": [
+      "test/*.ts"
+    ]
   }
 }

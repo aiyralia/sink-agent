@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-import { Parser, yay } from "./lib.ts";
+import { Parser, parser, yay } from "./lib.ts";
 import { few, optional, pick, range, sequence } from "./constructions.ts";
 
 export { $ } from "./stream.ts";
@@ -25,6 +25,14 @@ export const lowercase = range("a", "z") as Parser<Alphabet>;
 export const uppercase = range("A", "Z") as Parser<Uppercase<Alphabet>>;
 export const alpha = pick(lowercase, uppercase);
 export const alphanumeric = pick(alpha, digit);
+
+export const greedyString = parser((stream) => {
+  const content = stream.tail();
+  for (let index = 0; index < content.length; index++) {
+    stream.advance();
+  }
+  return yay(content);
+}, "greedy_string");
 
 type Alphabet =
   | "a"

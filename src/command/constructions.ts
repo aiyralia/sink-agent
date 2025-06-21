@@ -135,6 +135,20 @@ export function only<T>(lexer: Lexer<T>): Parser<T> {
   }, "only");
 }
 
+export function all<T>(lexer: Lexer<T>): Parser<T[]> {
+  return construct((stream) => {
+    const output: T[] = [];
+    while (stream.tail()) {
+      const attempt = construct(lexer)(stream);
+      if (!infer("success")(attempt)) {
+        return attempt as ParsingResult<never>;
+      }
+      output.push(attempt.data as T);
+    }
+    return yay(output);
+  }, "all");
+}
+
 export function sequence<T>(lexer: Lexer<T>): Parser<T[]> {
   return few(lexer, many(lexer)).map("sequence", (_, [a, b]) => yay([a, ...b]));
 }

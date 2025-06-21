@@ -21,7 +21,7 @@ import {
   unexpectedSymbol,
   yay,
 } from "./lib.ts";
-import { alphanumeric } from "./primitives.ts";
+import { alphanumeric, greedyString } from "./primitives.ts";
 
 export const skip = many(whitespace);
 
@@ -51,7 +51,7 @@ export const escape = few(literal("\\"), pick('"', "\\", "n", "t", "r")).map(
 
 export const quoted = (delimiter: string) =>
   few(
-    literal('"'),
+    literal(delimiter),
     many(pick(
       escape,
       construct((stream) => {
@@ -62,20 +62,12 @@ export const quoted = (delimiter: string) =>
         return yay(char);
       }, "quoted_inner"),
     )),
-    literal('"'),
+    literal(delimiter),
   ).map("quoted", (_, [, chars]) => yay(chars.join("")));
 
 export const quotedString = pick(quoted('"'), quoted("'"));
 
 export const string = pick(quotedString, word);
-
-export const greedyString = construct((stream) => {
-  const content = stream.tail();
-  for (let index = 0; index < content.length; index++) {
-    stream.advance();
-  }
-  return yay(content);
-}, "greedy_string");
 
 export const identifier = sequence(
   pick(alphanumeric, literal("-"), literal("_")),
@@ -90,14 +82,14 @@ export const positional = <T>(name: string, kind: Lexer<T>) =>
   few(skip, flag(name), skip, kind)
     .map(
       "positional",
-      (_, [, key, , value]) => yay({ type: "positional", key, value: value }),
+      (_, [, , , value]) => yay(value),
     );
 
 export const prefix = pick(
   literal("/"),
   literal("$"),
   few(literal("<@1384657966061326406>"), optional(literal(" ")))
-    .map("prefix", (_, [prefix]) => yay(prefix)),
+    .map("prefix", (_, [prefix]) => yay(prefix + " ")),
 );
 
 export interface Command<T extends Record<string, any>> {
@@ -123,19 +115,14 @@ export function command<L extends Record<string, Parser<any>>>(
             ? optional(positional(name, lx.next!))
             : positional(name, lx)
         ),
-      optional(
-        few(skip, greedyString).map(
-          "ws_greedy_string",
-          (_, [, text]) => yay(text),
-        ),
+    ),
+    optional(
+      few(skip, greedyString).map(
+        "ws_greedy_string",
+        (_, [, text]) => yay(text),
       ),
     ),
-  ).map("command", (_, [prefix, label, args]) => {
-    const remaining = args.length <= 1
-      ? args.join(" ")
-      : args[args.length - 1] as string;
-    if (args.length) args.pop();
-
+  ).map("command", (_, [prefix, label, args, remaining]) => {
     const namedArgs = Object.fromEntries(
       keys.map((k, i) => [k, args[i]]),
     ) as { [K in keyof L]: L[K] extends Lexer<infer U> ? U : never };
